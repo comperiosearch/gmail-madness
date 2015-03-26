@@ -8,14 +8,14 @@ import sys
 import html5lib
 import dateutil.parser as parser
 import argparse
+import elasticsearch
 
 def jsonify_message(msg):
     
-    my_dict = {}
-    my_dict['To'] = parseaddr(msg['To'])[1]
-    my_dict['From'] = parseaddr(msg['From'])[1]
+    
+    msg['To'] = parseaddr(msg['To'])[1]
+    msg['From'] = parseaddr(msg['From'])[1]
 
-    my_dict['Subject'] = msg['Subject']
     
     try:
         if msg.is_multipart():
@@ -26,19 +26,21 @@ def jsonify_message(msg):
         pass
     else:
         parsed = BeautifulSoup(content, "html5lib").get_text().replace('\n', '').replace('\t', '')
-        my_dict['Message'] = ' '.join(parsed.split())
+        msg['contents'] = ' '.join(parsed.split())
 
     try:
         date = parser.parse(msg['Date']).isoformat()
     except:
         date = ''
 
-    my_dict['Date'] = date
+    msg['Date'] = date
 
-    return my_dict
+    return {k: v for k, v in msg.items()}
 
 
 def main(path):
+    es = elasticsearch.Elasticsearch('http://localhost:9200')
+
     with open(path, 'rb') as mb_file:
         mbox = mailbox.UnixMailbox(mb_file, email.message_from_file)
         while True:
@@ -46,7 +48,8 @@ def main(path):
             if my_mail is None: break
             my_json = jsonify_message(my_mail)
             if my_json['Date'] != '':
-                print(json.dumps(my_json))
+                # print(json.dumps(my_json))
+                es.index(index='mail', doc_type='message', body=my_json)
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
