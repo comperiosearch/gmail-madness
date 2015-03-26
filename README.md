@@ -8,3 +8,4 @@ Stuff to think about.
 - [ ] Both scripts puts the same fields into ES.
 - [ ] If connection error, dump to json and parse with Logstash
 - [ ] Set up dashboards so we know what's cool.
+- [ ] Vagrant box
