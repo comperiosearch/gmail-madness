@@ -1,0 +1,18 @@
+get mail/message/_mapping
+delete mail/message/_mapping
+
+PUT mail/message/_mapping
+{
+  "message": {
+    "properties": {
+      "to": {
+        "type": "string",
+        "index": "not_analyzed"
+      },
+      "from": {
+        "type": "string",
+        "index": "not_analyzed"
+      }
+    }
+  }
+}
