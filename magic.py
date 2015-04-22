@@ -1,5 +1,3 @@
-from datetime import date, datetime
-
 __author__ = 'sebastienmuller'
 
 import email
@@ -12,6 +10,8 @@ from os import path
 import dateutil.parser as parser
 import click
 import elasticsearch
+es_index = 'mail'
+es_type = 'message'
 
 
 def unicodish(s):
@@ -49,11 +49,13 @@ def parse_and_store(es, root, email_path):
     body['contents'] = content.getvalue()
     body['date'] = parse_date(body['date'])
 
-    if 'from' in body: body['from'] = parseaddr(body['from'])[1]
-    if 'to' in body: body['to'] = parseaddr(body['to'])[1]
+    if 'from' in body:
+        body['from'] = parseaddr(body['from'])[1]
+    if 'to' in body:
+        body['to'] = parseaddr(body['to'])[1]
 
     if body['date'] != '':
-        es.index(index='mail', doc_type='message', id=gm_id, body=body)
+        es.index(index=es_index, doc_type=es_type, id=gm_id, body=body)
 
 
 @click.command()
@@ -61,6 +63,11 @@ def parse_and_store(es, root, email_path):
 def index(root):
     """imports all gmvault emails at ROOT into INDEX"""
     es = elasticsearch.Elasticsearch()
+    if es.indices.exists(index=es_index):
+        es.indices.delete(es_index)
+    es.indices.create(es_index)
+    mapping = json.loads(open("mapping.json", "r").read())
+    es.indices.put_mapping(body=mapping, index=es_index, doc_type=es_type)
     root = path.abspath(root)
     for base, subdirs, files in os.walk(root):
         for name in files:
