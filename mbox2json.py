@@ -45,6 +45,7 @@ def jsonify(mail):
     msg['date'] = date
     msg['labels'] = mail['labels']
     msg['flags'] = mail['flags']
+    msg['subject'] = mail['subject']
 
     return msg
 
@@ -71,7 +72,7 @@ def main(path):
                 # batch.append('{"index": {}}\n')
                 batch.append(''.join(['{"index": {}}\n', json.dumps(my_json), '\n']))
                 print 'appended'
-            if len(batch) > 60:
+            if len(batch) > 40:
                 es.bulk(body=batch, index=es_index, doc_type=es_type)
                 print 'batch finished'
                 batch = []
