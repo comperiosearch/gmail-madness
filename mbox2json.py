@@ -64,8 +64,9 @@ def main(path):
             if my_json['date'] != '':
                 batch.append({'index': {}})
                 batch.append(my_json)
-            if len(batch) > 50:
+            if len(batch) > 500:
                 es.bulk(body=batch, index=es_index, doc_type=es_type)
+                batch = []
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
