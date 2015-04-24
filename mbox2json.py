@@ -13,34 +13,35 @@ import elasticsearch
 
 fields = {'labels', 'contents', 'Subject', 'flags'}
 
-def jsonify(msg):
+def jsonify(mail):
 
-    msg['to'] = parseaddr(msg['To'])[1]
-    msg['from'] = parseaddr(msg['From'])[1]
+    msg = {}
+    msg['to'] = parseaddr(mail['To'])[1]
+    msg['from'] = parseaddr(mail['From'])[1]
 
     try:
-        if msg.is_multipart():
+        if mail.is_multipart():
             content = ''.join(part.get_payload(decode=True)
-                              for part in msg.get_payload())
+                              for part in mail.get_payload())
         else:
-            content = msg.get_payload(decode=True)
+            content = mail.get_payload(decode=True)
     except TypeError:
         # if the above parsing fails, we do nothing.
         pass
     else:
-
-        parsed = BeautifulSoup(content, "html5lib").get_text().replace('\n', '').replace('\t', '')
+        parsed = BeautifulSoup(content, "html.parser").get_text().replace('\n', '').replace('\t', '')
         msg['contents'] = ' '.join(parsed.split())
 
     try:
-        date = parser.parse(msg['Date']).isoformat()
+        date = parser.parse(mail['Date']).isoformat()
     except:
         date = ''
 
     msg['date'] = date
+    msg['labels'] = mail['labels']
+    msg['flags'] = mail['flags']
 
-    return {k: v for k, v in msg.items() if k in fields.union({'date', 'from', 'to'})}
-
+    return msg
 
 def main(path):
     es = elasticsearch.Elasticsearch('http://localhost:9200',
@@ -62,10 +63,12 @@ def main(path):
                 break
             my_json = jsonify(my_mail)
             if my_json['date'] != '':
-                batch.append({'index': {}})
-                batch.append(my_json)
-            if len(batch) > 500:
+                # batch.append('{"index": {}}\n')
+                batch.append(''.join(['{"index": {}}\n', json.dumps(my_json), '\n']))
+                print 'appended'
+            if len(batch) > 60:
                 es.bulk(body=batch, index=es_index, doc_type=es_type)
+                print 'batch finished'
                 batch = []
 
 if __name__ == '__main__':
