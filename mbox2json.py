@@ -30,8 +30,12 @@ def jsonify(mail):
         # if the above parsing fails, we do nothing.
         pass
     else:
-        parsed = BeautifulSoup(content, "html.parser").get_text().replace('\n', '').replace('\t', '')
-        msg['contents'] = ' '.join(parsed.split())
+        try:
+            parsed = BeautifulSoup(content, "html.parser").get_text().replace('\n', '').replace('\t', '')
+        except:
+            parsed = ''
+        finally:
+            msg['contents'] = ' '.join(parsed.split())
 
     try:
         date = parser.parse(mail['Date']).isoformat()
