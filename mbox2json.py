@@ -10,21 +10,25 @@ import dateutil.parser as parser
 import argparse
 import elasticsearch
 
-def jsonify_message(msg):
-    
-    
-    msg['To'] = parseaddr(msg['To'])[1]
-    msg['From'] = parseaddr(msg['From'])[1]
 
-    
+fields = {'labels', 'contents', 'Subject', 'flags'}
+
+def jsonify(msg):
+
+    msg['to'] = parseaddr(msg['To'])[1]
+    msg['from'] = parseaddr(msg['From'])[1]
+
     try:
         if msg.is_multipart():
-            content = ''.join(part.get_payload(decode=True) for part in msg.get_payload())
+            content = ''.join(part.get_payload(decode=True)
+                              for part in msg.get_payload())
         else:
             content = msg.get_payload(decode=True)
-    except TypeError as te:
+    except TypeError:
+        # if the above parsing fails, we do nothing.
         pass
     else:
+
         parsed = BeautifulSoup(content, "html5lib").get_text().replace('\n', '').replace('\t', '')
         msg['contents'] = ' '.join(parsed.split())
 
@@ -33,23 +37,35 @@ def jsonify_message(msg):
     except:
         date = ''
 
-    msg['Date'] = date
+    msg['date'] = date
 
-    return {k: v for k, v in msg.items()}
+    return {k: v for k, v in msg.items() if k in fields.union({'date', 'from', 'to'})}
 
 
 def main(path):
-    es = elasticsearch.Elasticsearch('http://localhost:9200')
+    es = elasticsearch.Elasticsearch('http://localhost:9200',
+                                     retry_on_timeout=True)
+    es_index = 'mail'
+    es_type = 'message'
+    if es.indices.exists(index=es_index):
+        es.indices.delete(es_index)
+    es.indices.create(es_index)
+    mapping = json.loads(open("mapping.json", "r").read())
+    es.indices.put_mapping(body=mapping, index=es_index, doc_type=es_type)
 
     with open(path, 'rb') as mb_file:
         mbox = mailbox.UnixMailbox(mb_file, email.message_from_file)
+        batch = []
         while True:
             my_mail = mbox.next()
-            if my_mail is None: break
-            my_json = jsonify_message(my_mail)
-            if my_json['Date'] != '':
-                # print(json.dumps(my_json))
-                es.index(index='mail', doc_type='message', body=my_json)
+            if my_mail is None: 
+                break
+            my_json = jsonify(my_mail)
+            if my_json['date'] != '':
+                batch.append({'index': {}})
+                batch.append(my_json)
+            if len(batch) > 50:
+                es.bulk(body=batch, index=es_index, doc_type=es_type)
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
@@ -63,6 +79,3 @@ if __name__ == '__main__':
     else:
         print('Not a file.')
 
-
-
-    
