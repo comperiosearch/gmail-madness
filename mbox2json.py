@@ -22,9 +22,10 @@ def jsonify(mail):
     try:
         if mail.is_multipart():
             content = ''.join(part.get_payload(decode=True)
-                              for part in mail.get_payload())
+                              for part in mail.get_payload()
+                              if part.get_content_type() == 'text/plain')
         else:
-            content = mail.get_payload(decode=True)
+            content = mail.get_payload(decode=True) if mail.get_content_type() == 'text/plain' else ''
     except TypeError:
         # if the above parsing fails, we do nothing.
         pass
