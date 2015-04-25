@@ -1,5 +1,3 @@
-__author__ = 'sebastienmuller'
-
 import email
 from email.utils import parseaddr
 import json
@@ -10,8 +8,16 @@ from os import path
 import dateutil.parser as parser
 import click
 import elasticsearch
+from bs4 import BeautifulSoup
+
+
 es_index = 'mail'
 es_type = 'message'
+batch_size = 20
+batch = []
+num_indexed = 0
+num_failed = 0
+
 
 
 def unicodish(s):
@@ -26,6 +32,11 @@ def parse_date(raw_date):
 
 
 def parse_and_store(es, root, email_path):
+    # blargh sorry for this
+    global batch
+    global num_indexed
+    global num_failed
+
     gm_id = path.split(email_path)[-1]
 
     with gzip.open(email_path + '.eml.gz', 'r') as fp:
@@ -42,20 +53,44 @@ def parse_and_store(es, root, email_path):
     else:
         content.write(unicodish(message.get_payload()))
 
-    meta['account'] = path.split(root)[-1]
-    meta['path'] = email_path
-
-    body = meta.copy()
+    body = {}
     body['contents'] = content.getvalue()
-    body['date'] = parse_date(body['date'])
+    body['date'] = parse_date(meta['date'])
+    try:
+        parsed = BeautifulSoup(body['contents'], "html.parser") \
+                    .get_text() \
+                    .replace('\n', '') \
+                    .replace('\t', '') \
+                    .replace('\r', '')
+    except Exception as e:
+        # This is bad practice, but the bs4 module is a bit unknown to me
+        # So I'm just wildcarding this exception here.
+        parsed = ''
+    finally:
+        body['contents'] = ' '.join(parsed.split())
 
-    if 'from' in body:
-        body['from'] = parseaddr(body['from'])[1]
-    if 'to' in body:
-        body['to'] = parseaddr(body['to'])[1]
+    body['labels'] = [x.replace('\\', '') for x in meta['labels']]
+    body['flags'] = [x.replace('\\', '') for x in meta['flags']]
+
+
+    if 'from' in meta:
+        body['from'] = parseaddr(meta['from'])[1]
+    if 'to' in meta:
+        body['to'] = parseaddr(meta['to'])[1]
 
     if body['date'] != '':
-        es.index(index=es_index, doc_type=es_type, id=gm_id, body=body)
+        batch.append(''.join(['{"index": {}}\n',
+                              json.dumps(body), '\n']))
+        num_indexed += 1
+    else:
+        num_failed += 1
+
+    if num_indexed != 0 and num_indexed % (batch_size) == 0:
+        es.bulk(body=batch, index=es_index, doc_type=es_type)
+        print 'I have indexed {} documents in total'.format(num_indexed)
+        print 'I have thrown away {} documents'.format(num_failed)
+        print '------------------------------------'
+        batch = []
 
 
 @click.command()
@@ -66,8 +101,10 @@ def index(root):
     if es.indices.exists(index=es_index):
         es.indices.delete(es_index)
     es.indices.create(es_index)
-    mapping = json.loads(open("mapping.json", "r").read())
-    es.indices.put_mapping(body=mapping, index=es_index, doc_type=es_type)
+    with open('mapping.json', 'r') as mapping_file:
+        mapping = json.loads(mapping_file.read())
+        es.indices.put_mapping(body=mapping, index=es_index, doc_type=es_type)
+
     root = path.abspath(root)
     for base, subdirs, files in os.walk(root):
         for name in files:

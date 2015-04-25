@@ -10,8 +10,6 @@ import argparse
 import elasticsearch
 
 
-fields = {'labels', 'contents', 'Subject', 'flags'}
-
 def jsonify(mail):
 
     msg = {}
@@ -35,8 +33,12 @@ def jsonify(mail):
             parsed = BeautifulSoup(content, "html.parser") \
                         .get_text() \
                         .replace('\n', '') \
-                        .replace('\t', '')
+                        .replace('\t', '') \
+                        .replace('\r', '')
+
         except:
+            # This is bad practice, but the bs4 module is a bit unknown to me
+            # So I'm just wildcarding this exception here.
             parsed = ''
         finally:
             msg['contents'] = ' '.join(parsed.split())
@@ -46,8 +48,9 @@ def jsonify(mail):
     except:
         date = ''
 
+    # print mail.keys()
     msg['date'] = date
-    msg['labels'] = mail['labels']
+    msg['labels'] = mail['X-Gmail-Labels']
     msg['flags'] = mail['flags']
     msg['subject'] = mail['subject']
 
