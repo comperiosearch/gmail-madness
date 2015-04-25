@@ -72,6 +72,7 @@ def main(path):
         mbox = mailbox.UnixMailbox(mb_file, email.message_from_file)
         batch = []
         num_indexed = 0
+        num_failed = 0
         while True:
             my_mail = mbox.next()
             if my_mail is None:
@@ -81,10 +82,14 @@ def main(path):
                 batch.append(''.join(['{"index": {}}\n',
                                       json.dumps(my_json), '\n']))
                 num_indexed += 1
+            else:
+                num_failed +=1
 
             if num_indexed != 0 and num_indexed % (batch_size) == 0:
                 es.bulk(body=batch, index=es_index, doc_type=es_type)
                 print 'I have indexed {} documents in total'.format(num_indexed)
+                print 'I have thrown away {} documents'.format(num_failed)
+                print '------------------------------------'
                 batch = []
 
 if __name__ == '__main__':
