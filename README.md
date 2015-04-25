@@ -11,7 +11,7 @@ Make sure your computer has ```git``` installed and that you are able to clone r
 1. A .mbox-formatted file with all your emails. You can get this from GMail [here](https://www.google.com/settings/takeout/custom/gmail). Alternatively, you can download your email with gmvault, but it is very slow. Other email providers may also give you such a file.
 2. A virtualization tool, we recommend [Virtualbox](https://www.virtualbox.org/)
 3. [Vagrant](https://www.vagrantup.com/downloads.html) must be installed as well.
-4. (This repo needs to be cloned)[https://github.com/comperiosearch/vagrant-elk-box/tree/gmail]
+4. [This repo needs to be cloned to your machine](https://github.com/comperiosearch/vagrant-elk-box/tree/gmail). You do that by running `git clone https://github.com/comperiosearch/vagrant-elk-box.git` somewhere on your computer.
 5. Make sure you are on branch ```gmail``` (run `git checkout gmail`)
 6. Run ```vagrant up```from the root of vagrant-elk-box folder.
 
