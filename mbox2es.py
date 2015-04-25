@@ -88,7 +88,7 @@ def main(path):
             else:
                 num_failed +=1
 
-            if num_indexed != 0 and num_indexed % (batch_size) == 0:
+            if num_indexed != 0 and num_indexed % (batch_size) == 0 and batch:
                 es.bulk(body=batch, index=es_index, doc_type=es_type)
                 print 'I have indexed {} documents in total'.format(num_indexed)
                 print 'I have thrown away {} documents'.format(num_failed)
