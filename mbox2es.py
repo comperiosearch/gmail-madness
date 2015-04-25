@@ -5,7 +5,6 @@ from email.utils import parseaddr
 from bs4 import BeautifulSoup
 import os
 import sys
-import html5lib
 import dateutil.parser as parser
 import argparse
 import elasticsearch
@@ -25,13 +24,18 @@ def jsonify(mail):
                               for part in mail.get_payload()
                               if part.get_content_type() == 'text/plain')
         else:
-            content = mail.get_payload(decode=True) if mail.get_content_type() == 'text/plain' else ''
+            if mail.get_content_type() == 'text/plain':
+                content = mail.get_payload(decode=True)
+            else:
+                content = ''
     except TypeError:
-        # if the above parsing fails, we do nothing.
-        pass
+        content = ''
     else:
         try:
-            parsed = BeautifulSoup(content, "html.parser").get_text().replace('\n', '').replace('\t', '')
+            parsed = BeautifulSoup(content, "html.parser") \
+                        .get_text() \
+                        .replace('\n', '') \
+                        .replace('\t', '')
         except:
             parsed = ''
         finally:
@@ -54,32 +58,38 @@ def main(path):
                                      retry_on_timeout=True)
     es_index = 'mail'
     es_type = 'message'
+    batch_size = 20
+
     if es.indices.exists(index=es_index):
         es.indices.delete(es_index)
     es.indices.create(es_index)
-    mapping = json.loads(open("mapping.json", "r").read())
-    es.indices.put_mapping(body=mapping, index=es_index, doc_type=es_type)
+
+    with open('mapping.json', 'r') as mapping_file:
+        mapping = json.loads(mapping_file.read())
+        es.indices.put_mapping(body=mapping, index=es_index, doc_type=es_type)
 
     with open(path, 'rb') as mb_file:
         mbox = mailbox.UnixMailbox(mb_file, email.message_from_file)
         batch = []
+        num_indexed = 0
         while True:
             my_mail = mbox.next()
-            if my_mail is None: 
+            if my_mail is None:
                 break
             my_json = jsonify(my_mail)
             if my_json['date'] != '':
-                # batch.append('{"index": {}}\n')
-                batch.append(''.join(['{"index": {}}\n', json.dumps(my_json), '\n']))
-                print 'appended'
-            if len(batch) > 40:
+                batch.append(''.join(['{"index": {}}\n',
+                                      json.dumps(my_json), '\n']))
+                num_indexed += 1
+
+            if num_indexed != 0 and num_indexed % (batch_size) == 0:
                 es.bulk(body=batch, index=es_index, doc_type=es_type)
-                print 'batch finished'
+                print 'I have indexed {} documents in total'.format(num_indexed)
                 batch = []
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("path_to_file", 
+    argparser.add_argument("path_to_file",
                         help="Specify the path of your .mbox file")
 
     args = argparser.parse_args()
@@ -88,4 +98,3 @@ if __name__ == '__main__':
         main(args.path_to_file)
     else:
         print('Not a file.')
-
