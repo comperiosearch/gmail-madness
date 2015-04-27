@@ -14,7 +14,9 @@ def jsonify(mail):
 
     msg = {}
     msg['to'] = parseaddr(mail['To'])[1]
+    msg['to_domain'] = msg['to'].split('@')[-1]
     msg['from'] = parseaddr(mail['From'])[1]
+    msg['from_domain'] = msg['from'].split('@')[-1]
 
     try:
         if mail.is_multipart():

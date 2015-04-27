@@ -75,8 +75,10 @@ def parse_and_store(es, root, email_path):
 
     if 'from' in meta:
         body['from'] = parseaddr(meta['from'])[1]
+        body['from_domain'] = body['from'].split('@')[-1]
     if 'to' in meta:
         body['to'] = parseaddr(meta['to'])[1]
+        body['to_domain'] = body['to'].split('@')[-1]
 
     if body['date'] != '':
         batch.append(''.join(['{"index": {}}\n',
