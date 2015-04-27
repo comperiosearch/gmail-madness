@@ -13,6 +13,7 @@ import elasticsearch
 def jsonify(mail):
 
     msg = {}
+    msg['cc'] = parseaddr(mail['Cc'])[1]
     msg['to'] = parseaddr(mail['To'])[1]
     msg['to_domain'] = msg['to'].split('@')[-1]
     msg['from'] = parseaddr(mail['From'])[1]
